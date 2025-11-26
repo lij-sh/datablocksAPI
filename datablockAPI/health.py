@@ -4,9 +4,12 @@ Health checks for monitoring and diagnostics.
 """
 
 from typing import Dict, Any
+import logging
+
 from .api.client import DNBAPIClient
 from .core.database import get_session
-from .logging_config import logger
+
+logger = logging.getLogger('datablockAPI')
 
 
 def health_check() -> Dict[str, Any]:
@@ -52,5 +55,4 @@ def _check_api_client() -> Dict[str, Any]:
         }
     except Exception as e:
         logger.error(f"API client health check failed: {e}")
-        return {"status": "unhealthy", "message": str(e)}</content>
-<parameter name="filePath">c:\Users\jun\dataground\datablockAPI\health.py
+        return {"status": "unhealthy", "message": str(e)}

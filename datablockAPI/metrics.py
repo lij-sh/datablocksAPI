@@ -69,5 +69,5 @@ def record_database_operation(operation: str, success: bool = True):
     else:
         metrics.increment("db_operations_failed")
 
-    metrics.increment(f"db_operations_{operation}")</content>
+    metrics.increment(f"db_operations_{operation}")
 <parameter name="filePath">c:\Users\jun\dataground\datablockAPI\metrics.py

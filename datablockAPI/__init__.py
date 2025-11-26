@@ -5,8 +5,6 @@ Entry point for the API with init() and load() functions.
 
 from .core.database import init, close, get_session
 from .core.loader import load
-from .health import health_check
-from .metrics import metrics
 
 __version__ = "0.2.0"
-__all__ = ["init", "load", "close", "get_session", "health_check", "metrics"]
+__all__ = ["init", "load", "close", "get_session"]
