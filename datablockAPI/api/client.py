@@ -74,7 +74,8 @@ class DNBAPIClient:
             expires_in = auth_data.get('expiresIn', 86400)
             self.token_expiry = datetime.now() + timedelta(seconds=expires_in)
             
-            print(f"✓ Authenticated successfully. Token expires at {self.token_expiry}")
+            logger.info(f"✓ Authenticated successfully. Token expires at {self.token_expiry}")
+            record_api_call("authenticate", success=True)
             return self.access_token
             
         except requests.exceptions.RequestException as e:
