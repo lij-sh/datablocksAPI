@@ -9,6 +9,8 @@ from typing import List, Optional, Dict, Any, Union
 from datetime import datetime, timedelta
 import json
 
+from datablockAPI.exceptions import AuthenticationError, RateLimitError, APIError
+
 
 class DNBAPIClient:
     """Client for D&B Direct+ Data Blocks API."""
@@ -133,162 +135,20 @@ class DNBAPIClient:
         except requests.exceptions.RequestException as e:
             # Show more detailed error info
             if hasattr(e, 'response') and e.response is not None:
-                print(f"Response status: {e.response.status_code}")
-                print(f"Response body: {e.response.text}")
-            raise Exception(f"Authentication failed: {e}")
+                status_code = e.response.status_code
+                if status_code == 401:
+                    raise AuthenticationError(f"Authentication failed: Invalid credentials")
+                elif status_code == 429:
+                    raise RateLimitError(f"Rate limit exceeded")
+                else:
+                    raise APIError(f"Authentication failed with status {status_code}: {e}")
+            else:
+                raise APIError(f"Authentication failed: {e}")
     
     def _ensure_authenticated(self):
         """Ensure we have a valid access token."""
         if not self.access_token or not self.token_expiry or datetime.now() >= self.token_expiry:
             self.authenticate()
-    
-    def get_data_blocks(
-        self,
-        duns_number: str,
-        block_ids: List[str],
-        trade_up: Optional[str] = None,
-        customer_reference: Optional[str] = None,
-        save_to_file: bool = False,
-        output_dir: str = "dnb_data"
-    ) -> Dict[str, Any]:
-        """
-        Get data blocks for a DUNS number.
-        
-        Args:
-            duns_number: 9-digit DUNS number
-            block_ids: List of block IDs to request (e.g., ['companyinfo_L2_v1', 'eventfilings_L3_v1'])
-            trade_up: Optional trade up parameter ('hq' or 'domhq')
-            customer_reference: Optional reference string (up to 240 chars)
-            save_to_file: Whether to save response to JSON file
-            output_dir: Directory to save JSON files (if save_to_file=True)
-        
-        Returns:
-            Dictionary with API response data
-        
-        Example:
-            >>> client = DNBAPIClient()
-            >>> data = client.get_data_blocks(
-            ...     duns_number='540924028',
-            ...     block_ids=['companyinfo_L2_v1', 'eventfilings_L3_v1'],
-            ...     save_to_file=True
-            ... )
-        """
-        self._ensure_authenticated()
-        
-        # Build URL
-        url = f"{self.api_url}/v1/data/duns/{duns_number}"
-        
-        # Build query parameters
-        params = {
-            'blockIDs': ','.join(block_ids)
-        }
-        
-        if trade_up:
-            if trade_up not in ['hq', 'domhq']:
-                raise ValueError("trade_up must be 'hq' or 'domhq'")
-            params['tradeUp'] = trade_up
-        
-        if customer_reference:
-            if len(customer_reference) > 240:
-                raise ValueError("customer_reference must be 240 characters or less")
-            params['customerReference'] = customer_reference
-        
-        # Build headers
-        headers = {
-            'Authorization': f'Bearer {self.access_token}',
-            'Accept': 'application/json'
-        }
-        
-        try:
-            print(f"\n📡 Requesting data blocks for DUNS {duns_number}...")
-            print(f"   Block IDs: {', '.join(block_ids)}")
-            print(f"   URL: {url}")
-            print(f"   Params: {params}")
-            print(f"   Headers: Authorization=Bearer {self.access_token[:20]}..., Accept=application/json")
-            
-            response = self.session.get(url, params=params, headers=headers)
-            response.raise_for_status()
-            
-            data = response.json()
-            
-            print(f"✓ Data retrieved successfully")
-            
-            # Save to file if requested
-            if save_to_file:
-                os.makedirs(output_dir, exist_ok=True)
-                
-                # Determine filename based on block IDs
-                block_names = '_'.join([bid.split('_')[0] for bid in block_ids])
-                filename = f"{duns_number}_{block_names}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-                filepath = os.path.join(output_dir, filename)
-                
-                with open(filepath, 'w', encoding='utf-8') as f:
-                    json.dump(data, f, indent=2, ensure_ascii=False)
-                
-                print(f"✓ Saved to: {filepath}")
-            
-            return data
-            
-        except requests.exceptions.HTTPError as e:
-            if response.status_code == 401:
-                raise Exception("Authentication failed. Check your API credentials.")
-            elif response.status_code == 404:
-                raise Exception(f"DUNS {duns_number} not found or you don't have access.")
-            else:
-                raise Exception(f"API request failed: {e}\n{response.text}")
-        except requests.exceptions.RequestException as e:
-            raise Exception(f"Network error: {e}")
-    
-    def get_company_info(self, duns_number: str, save_to_file: bool = True) -> Dict[str, Any]:
-        """
-        Get company information data block.
-        
-        Args:
-            duns_number: 9-digit DUNS number
-            save_to_file: Whether to save response to JSON file (default: True)
-        
-        Returns:
-            Company information data
-        """
-        return self.get_data_blocks(
-            duns_number=duns_number,
-            block_ids=['companyinfo_L2_v1'],
-            save_to_file=save_to_file
-        )
-    
-    def get_events_filings(self, duns_number: str, save_to_file: bool = True) -> Dict[str, Any]:
-        """
-        Get events and filings data block.
-        
-        Args:
-            duns_number: 9-digit DUNS number
-            save_to_file: Whether to save response to JSON file (default: True)
-        
-        Returns:
-            Events and filings data
-        """
-        return self.get_data_blocks(
-            duns_number=duns_number,
-            block_ids=['eventfilings_L3_v1'],
-            save_to_file=save_to_file
-        )
-    
-    def get_financials(self, duns_number: str, save_to_file: bool = True) -> Dict[str, Any]:
-        """
-        Get financial data block.
-        
-        Args:
-            duns_number: 9-digit DUNS number
-            save_to_file: Whether to save response to JSON file (default: True)
-        
-        Returns:
-            Financial data
-        """
-        return self.get_data_blocks(
-            duns_number=duns_number,
-            block_ids=['companyfinancial_L1_v1'],
-            save_to_file=save_to_file
-        )
     
     def request_data_blocks(self, duns_number: str, block_ids: List[str], output_dir: str = "dnb_data") -> Dict[str, Any]:
         """
@@ -307,12 +167,70 @@ class DNBAPIClient:
             >>> data = client.request_data_blocks('540924028', ['companyinfo_L2_v1'])
             >>> # Requests only company info and saves to dnb_data/
         """
-        return self.get_data_blocks(
-            duns_number=duns_number,
-            block_ids=block_ids,
-            save_to_file=True,
-            output_dir=output_dir
-        )
+        # Validate inputs
+        if not duns_number or not duns_number.isdigit() or len(duns_number) != 9:
+            raise ValueError("DUNS number must be a 9-digit string")
+        
+        if not block_ids:
+            raise ValueError("At least one block ID must be specified")
+        
+        # Ensure we have a valid access token
+        self._ensure_authenticated()
+        
+        # Create output directory if it doesn't exist
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Prepare API request
+        url = f"{self.api_url}/v1/data/duns/{duns_number}"
+        headers = {
+            'Authorization': f'Bearer {self.access_token}',
+            'Content-Type': 'application/json'
+        }
+        
+        params = {
+            'blockIDs': ','.join(block_ids)
+        }
+        
+        try:
+            response = self.session.get(url, headers=headers, params=params)
+            response.raise_for_status()
+            
+            data = response.json()
+            
+            # Save each block to separate JSON file
+            for block_id in block_ids:
+                if block_id in data:
+                    filename = f"{duns_number}_{block_id}.json"
+                    filepath = os.path.join(output_dir, filename)
+                    with open(filepath, 'w', encoding='utf-8') as f:
+                        json.dump(data[block_id], f, indent=2, ensure_ascii=False)
+                    print(f"✓ Saved {block_id} to {filepath}")
+            
+            return data
+            
+        except requests.exceptions.RequestException as e:
+            # Handle authentication errors by retrying once
+            if hasattr(e, 'response') and e.response and e.response.status_code == 401:
+                print("Token expired, re-authenticating...")
+                self.access_token = None  # Force re-authentication
+                self._ensure_authenticated()
+                # Retry the request
+                response = self.session.get(url, headers=headers, params=params)
+                response.raise_for_status()
+                data = response.json()
+                
+                # Save each block to separate JSON file
+                for block_id in block_ids:
+                    if block_id in data:
+                        filename = f"{duns_number}_{block_id}.json"
+                        filepath = os.path.join(output_dir, filename)
+                        with open(filepath, 'w', encoding='utf-8') as f:
+                            json.dump(data[block_id], f, indent=2, ensure_ascii=False)
+                        print(f"✓ Saved {block_id} to {filepath}")
+                
+                return data
+            else:
+                raise Exception(f"API request failed: {e}")
     
     def request_company_info(self, duns_number: str, output_dir: str = "dnb_data") -> Dict[str, Any]:
         """

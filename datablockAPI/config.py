@@ -3,44 +3,45 @@ datablockAPI - Configuration Management
 Centralized configuration with validation using Pydantic.
 """
 
-from pydantic import BaseSettings, Field
+from pydantic_settings import BaseSettings
+from pydantic import Field
 from typing import Optional
 import os
 
 
-class DatabaseConfig(BaseSettings):
+class DatabaseConfig:
     """Database configuration settings."""
-    url: str = Field(default="sqlite:///datablock.db", env="DATABASE_URL")
-    echo: bool = Field(default=False, env="DATABASE_ECHO")
+    def __init__(self):
+        self.url = os.getenv('DATABASE_URL', 'sqlite:///datablock.db')
+        self.echo = os.getenv('DATABASE_ECHO', 'False').lower() == 'true'
 
 
-class APIConfig(BaseSettings):
+class APIConfig:
     """D&B API configuration settings."""
-    key: Optional[str] = Field(default=None, env="DNB_API_KEY")
-    secret: Optional[str] = Field(default=None, env="DNB_API_SECRET")
-    url: str = Field(default="https://plus.dnb.com", env="DNB_API_URL")
-    timeout: int = Field(default=30, env="DNB_API_TIMEOUT")
-    max_retries: int = Field(default=3, env="DNB_API_MAX_RETRIES")
-    rate_limit_per_minute: int = Field(default=60, env="DNB_RATE_LIMIT_PER_MINUTE")
+    def __init__(self):
+        self.key = os.getenv('DNB_API_KEY')
+        self.secret = os.getenv('DNB_API_SECRET')
+        self.url = os.getenv('DNB_API_URL', 'https://plus.dnb.com')
+        self.timeout = int(os.getenv('DNB_API_TIMEOUT', '30'))
+        self.max_retries = int(os.getenv('DNB_API_MAX_RETRIES', '3'))
+        self.rate_limit_per_minute = int(os.getenv('DNB_RATE_LIMIT_PER_MINUTE', '60'))
 
 
-class LoggingConfig(BaseSettings):
+class LoggingConfig:
     """Logging configuration settings."""
-    level: str = Field(default="INFO", env="LOG_LEVEL")
-    format: str = Field(default="%(asctime)s - %(name)s - %(levelname)s - %(message)s", env="LOG_FORMAT")
+    def __init__(self):
+        self.level = os.getenv('LOG_LEVEL', 'INFO')
+        self.format = os.getenv('LOG_FORMAT', '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 
-class Config(BaseSettings):
+class Config:
     """Main configuration class."""
-    database: DatabaseConfig = DatabaseConfig()
-    api: APIConfig = APIConfig()
-    logging: LoggingConfig = LoggingConfig()
-
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    
+    def __init__(self):
+        self.database = DatabaseConfig()
+        self.api = APIConfig()
+        self.logging = LoggingConfig()
 
 
 # Global configuration instance
-config = Config()</content>
-<parameter name="filePath">c:\Users\jun\dataground\datablockAPI\config.py
+config = Config()

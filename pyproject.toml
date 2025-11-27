@@ -121,5 +121,4 @@ addopts = [
     "--strict-markers",
     "--strict-config",
     "--disable-warnings",
-]</content>
-<parameter name="filePath">c:\Users\jun\dataground\pyproject.toml
+]

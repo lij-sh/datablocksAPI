@@ -11,11 +11,9 @@ from datablockAPI.config import Config
 @pytest.fixture
 def test_config():
     """Test configuration with test-specific settings."""
-    return Config(
-        database__url="sqlite:///:memory:",
-        api__timeout=5,
-        api__max_retries=1
-    )
+    # For now, just return the default config
+    # TODO: Implement test-specific config overrides if needed
+    return Config()
 
 
 @pytest.fixture(autouse=True)
@@ -35,5 +33,4 @@ def mock_env_vars():
 
     # Restore original environment
     os.environ.clear()
-    os.environ.update(original_env)</content>
-<parameter name="filePath">c:\Users\jun\dataground\tests\conftest.py
+    os.environ.update(original_env)
