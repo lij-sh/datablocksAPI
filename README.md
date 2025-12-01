@@ -377,7 +377,7 @@ black datablockAPI/
 # Lint code
 ruff check datablockAPI/
 
-# Type checking
+# Type checking (optional - not required for CI)
 mypy datablockAPI/
 ```
 
