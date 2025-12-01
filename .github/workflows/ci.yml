@@ -24,5 +24,4 @@ jobs:
     - name: Run Ruff
       run: ruff check datablockAPI/
     - name: Run MyPy
-      run: mypy datablockAPI/</content>
-<parameter name="filePath">c:\Users\jun\dataground\.github\workflows\ci.yml
+      run: mypy datablockAPI/
