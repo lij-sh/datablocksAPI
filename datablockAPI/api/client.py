@@ -127,7 +127,7 @@ class DNBAPIClient:
             expires_in = auth_data.get('expiresIn', 86400)
             self.token_expiry = datetime.now() + timedelta(seconds=expires_in)
             
-            print(f"✓ Authenticated successfully. Token expires at {self.token_expiry}")
+            print(f"✓ Authenticated successfully")
             # logger.info(f"✓ Authenticated successfully. Token expires at {self.token_expiry}")
             # record_api_call("authenticate", success=True)
             return self.access_token
@@ -194,20 +194,10 @@ class DNBAPIClient:
         try:
             response = self.session.get(url, headers=headers, params=params)
             response.raise_for_status()
-            
+
             data = response.json()
-            
-            # Save each block to separate JSON file
-            for block_id in block_ids:
-                if block_id in data:
-                    filename = f"{duns_number}_{block_id}.json"
-                    filepath = os.path.join(output_dir, filename)
-                    with open(filepath, 'w', encoding='utf-8') as f:
-                        json.dump(data[block_id], f, indent=2, ensure_ascii=False)
-                    print(f"✓ Saved {block_id} to {filepath}")
-            
             return data
-            
+
         except requests.exceptions.RequestException as e:
             # Handle authentication errors by retrying once
             if hasattr(e, 'response') and e.response and e.response.status_code == 401:
@@ -218,75 +208,100 @@ class DNBAPIClient:
                 response = self.session.get(url, headers=headers, params=params)
                 response.raise_for_status()
                 data = response.json()
-                
-                # Save each block to separate JSON file
-                for block_id in block_ids:
-                    if block_id in data:
-                        filename = f"{duns_number}_{block_id}.json"
-                        filepath = os.path.join(output_dir, filename)
-                        with open(filepath, 'w', encoding='utf-8') as f:
-                            json.dump(data[block_id], f, indent=2, ensure_ascii=False)
-                        print(f"✓ Saved {block_id} to {filepath}")
-                
                 return data
+            elif hasattr(e, 'response') and e.response and e.response.status_code == 404:
+                # Handle unavailable data blocks gracefully
+                block_id = block_ids[0] if len(block_ids) == 1 else ','.join(block_ids)
+                print(f"⚠️ Block(s) {block_id} not available")
+                return {}
             else:
                 raise Exception(f"API request failed: {e}")
-    
+
     def request_company_info(self, duns_number: str, output_dir: str = "dnb_data") -> Dict[str, Any]:
         """
-        Request company information data block and save to JSON.
-        
+        Request company information data block and save raw JSON response to local file.
+
         Args:
             duns_number: 9-digit DUNS number
             output_dir: Directory to save JSON file (default: 'dnb_data')
-        
+
         Returns:
-            Company information data
+            Raw API response data
         """
-        return self.request_data_blocks(duns_number, ['companyinfo_L2_v1'], output_dir)
+        data = self.request_data_blocks(duns_number, ['companyinfo_L2_v1'], output_dir)
+
+        # Save the complete raw API response to JSON file
+        filename = f"{duns_number}_companyinfo_L2_v1.json"
+        filepath = os.path.join(output_dir, filename)
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+        print(f"✓ Saved raw response to {filepath}")
+
+        return data
     
     def request_company_financials(self, duns_number: str, output_dir: str = "dnb_data") -> Dict[str, Any]:
         """
-        Request company financial data block and save to JSON.
-        
+        Request company financial data block and save raw JSON response to local file.
+
         Args:
             duns_number: 9-digit DUNS number
             output_dir: Directory to save JSON file (default: 'dnb_data')
-        
+
         Returns:
-            Company financial data
+            Raw API response data
         """
-        return self.request_data_blocks(duns_number, ['companyfinancial_L1_v1'], output_dir)
+        data = self.request_data_blocks(duns_number, ['companyfinancial_L1_v1'], output_dir)
+
+        # Save the complete raw API response to JSON file
+        filename = f"{duns_number}_companyfinancial_L1_v1.json"
+        filepath = os.path.join(output_dir, filename)
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+        print(f"✓ Saved raw response to {filepath}")
+
+        return data
     
     def request_events_filings(self, duns_number: str, output_dir: str = "dnb_data") -> Dict[str, Any]:
         """
-        Request events and filings data block and save to JSON.
-        
+        Request events and filings data block and save raw JSON response to local file.
+
         Args:
             duns_number: 9-digit DUNS number
             output_dir: Directory to save JSON file (default: 'dnb_data')
-        
+
         Returns:
-            Events and filings data
+            Raw API response data
         """
-        return self.request_data_blocks(duns_number, ['eventfilings_L3_v1'], output_dir)
+        data = self.request_data_blocks(duns_number, ['eventfilings_L3_v1'], output_dir)
+
+        # Save the complete raw API response to JSON file
+        filename = f"{duns_number}_eventfilings_L3_v1.json"
+        filepath = os.path.join(output_dir, filename)
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+        print(f"✓ Saved raw response to {filepath}")
+
+        return data
     
     def request_all_data(self, duns_number: str, output_dir: str = "dnb_data") -> Dict[str, Any]:
         """
-        Request all common data blocks and save to JSON.
+        Request all common data blocks and save each to separate JSON files.
         
         Args:
             duns_number: 9-digit DUNS number
-            output_dir: Directory to save JSON file (default: 'dnb_data')
+            output_dir: Directory to save JSON files (default: 'dnb_data')
         
         Returns:
-            Complete data with all blocks
+            Dictionary containing all response data
         """
-        return self.request_data_blocks(
-            duns_number, 
-            ['companyinfo_L2_v1', 'eventfilings_L3_v1', 'companyfinancial_L1_v1'], 
-            output_dir
-        )
+        results = {}
+        
+        # Request each data block separately and save to individual files
+        results['companyinfo'] = self.request_company_info(duns_number, output_dir)
+        results['companyfinancial'] = self.request_company_financials(duns_number, output_dir)
+        results['eventfilings'] = self.request_events_filings(duns_number, output_dir)
+        
+        return results
     
     def _load_recent_files_to_db(self, output_dir: str = "dnb_data", max_files: int = 10):
         """
@@ -335,128 +350,6 @@ class DNBAPIClient:
         print(f"📥 Loading JSON files to database...")
         api.load(json_files)
         print("✓ Data loaded to database")
-    
-    def query_companies(self, duns: Optional[str] = None, country: Optional[str] = None, 
-                       limit: int = 10) -> List[Dict[str, Any]]:
-        """
-        Query companies from the database.
-        
-        Args:
-            duns: Filter by specific DUNS number
-            country: Filter by country code (e.g., 'US', 'CA')
-            limit: Maximum number of results to return
-        
-        Returns:
-            List of company dictionaries
-        
-        Example:
-            >>> companies = client.query_companies(country='US', limit=5)
-            >>> for company in companies:
-            ...     print(f"{company['duns']}: {company['primary_name']}")
-        """
-        from datablockAPI.core.models import Company
-        
-        session = self.get_session()
-        
-        try:
-            query = session.query(Company)
-            
-            if duns:
-                query = query.filter(Company.duns == duns)
-            if country:
-                query = query.filter(Company.country_iso_alpha2_code == country)
-            
-            companies = query.limit(limit).all()
-            
-            results = []
-            for company in companies:
-                results.append({
-                    'duns': company.duns,
-                    'primary_name': company.primary_name,
-                    'country': company.country_iso_alpha2_code,
-                    'created_at': company.created_at,
-                    'updated_at': company.updated_at
-                })
-            
-            return results
-            
-        finally:
-            session.close()
-    
-    def get_company_details(self, duns: str) -> Optional[Dict[str, Any]]:
-        """
-        Get detailed information for a specific company.
-        
-        Args:
-            duns: DUNS number to query
-        
-        Returns:
-            Dictionary with company details or None if not found
-        
-        Example:
-            >>> details = client.get_company_details('540924028')
-            >>> if details:
-            ...     print(f"Company: {details['company_info']['primary_name']}")
-            ...     print(f"Industry: {details['company_info']['industry_code']}")
-        """
-        from datablockAPI.core.models import Company
-        
-        session = self.get_session()
-        
-        try:
-            company = session.query(Company).filter(Company.duns == duns).first()
-            
-            if not company:
-                return None
-            
-            result = {
-                'company': {
-                    'duns': company.duns,
-                    'primary_name': company.primary_name,
-                    'country': company.country_iso_alpha2_code
-                }
-            }
-            
-            # Add company info if available
-            if company.company_info:
-                info = company.company_info
-                result['company_info'] = {
-                    'primary_name': info.primary_name,
-                    'country': info.country_iso_alpha2_code,
-                    'industry_description': info.primary_industry_description_sic_v4,
-                    'operating_status': info.operating_status_description,
-                    'business_entity_type': info.business_entity_type_desc
-                }
-                
-                # Add employee figures if available
-                if info.employee_figures:
-                    latest_employee = max(info.employee_figures, key=lambda x: x.employee_figures_date or '1900-01-01')
-                    result['company_info']['employee_count'] = latest_employee.value
-            
-            # Add financial summary if available (from financial statements)
-            if hasattr(company, 'financial_statements') and company.financial_statements:
-                # Get the most recent financial statement
-                financials = max(company.financial_statements, key=lambda x: x.fiscal_year or 0)
-                result['financials'] = {
-                    'fiscal_year': financials.fiscal_year,
-                    'currency': financials.currency
-                }
-                
-                # Add financial overview if available
-                if financials.financial_overview:
-                    overview = financials.financial_overview
-                    result['financials'].update({
-                        'total_assets': overview.total_assets,
-                        'total_liabilities': overview.total_liabilities,
-                        'net_worth': overview.net_worth,
-                        'sales_revenue': overview.sales_revenue,
-                        'net_income': overview.net_income
-                    })
-            
-            return result
-            
-        finally:
-            session.close()
 
 
 def main():

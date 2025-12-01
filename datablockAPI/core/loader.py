@@ -846,7 +846,7 @@ def _load_legal_events(session, company: Company, legal_events: Dict):
         session.flush()
         
         # Load lien filings
-        for filing_data in liens_data.get('filings', []):
+        for filing_data in _get_list(liens_data, 'filings'):
             filing = LienFiling(
                 lien_id=lien.id,
                 company_id=company.id,
@@ -863,7 +863,7 @@ def _load_legal_events(session, company: Company, legal_events: Dict):
             session.flush()
             
             # Load role players
-            for rp_data in filing_data.get('rolePlayers', []):
+            for rp_data in _get_list(filing_data, 'rolePlayers'):
                 role_player = LienFilingRolePlayer(
                     lien_filing_id=filing.id,
                     role_player_type_desc=_get_nested(rp_data, 'rolePlayerType', 'description'),
@@ -878,7 +878,7 @@ def _load_legal_events(session, company: Company, legal_events: Dict):
                 )
                 session.add(role_player)
         
-        print(f"  ✓ Loaded {len(liens_data.get('filings', []))} lien filings")
+        print(f"  ✓ Loaded {len(_get_list(liens_data, 'filings'))} lien filings")
     
     # Load judgments (similar structure)
     judgments_data = legal_events.get('judgments', {})
@@ -894,7 +894,7 @@ def _load_legal_events(session, company: Company, legal_events: Dict):
         session.add(judgment)
         session.flush()
         
-        for filing_data in judgments_data.get('filings', []):
+        for filing_data in _get_list(judgments_data, 'filings'):
             filing = JudgmentFiling(
                 judgment_id=judgment.id,
                 company_id=company.id,
@@ -910,7 +910,7 @@ def _load_legal_events(session, company: Company, legal_events: Dict):
             session.add(filing)
             session.flush()
             
-            for rp_data in filing_data.get('rolePlayers', []):
+            for rp_data in _get_list(filing_data, 'rolePlayers'):
                 role_player = JudgmentFilingRolePlayer(
                     judgment_filing_id=filing.id,
                     role_player_type_desc=_get_nested(rp_data, 'rolePlayerType', 'description'),
@@ -925,7 +925,7 @@ def _load_legal_events(session, company: Company, legal_events: Dict):
                 )
                 session.add(role_player)
         
-        print(f"  ✓ Loaded {len(judgments_data.get('filings', []))} judgment filings")
+        print(f"  ✓ Loaded {len(_get_list(judgments_data, 'filings'))} judgment filings")
     
     # Load suits (similar structure)
     suits_data = legal_events.get('suits', {})
@@ -941,7 +941,7 @@ def _load_legal_events(session, company: Company, legal_events: Dict):
         session.add(suit)
         session.flush()
         
-        for filing_data in suits_data.get('filings', []):
+        for filing_data in _get_list(suits_data, 'filings'):
             filing = SuitFiling(
                 suit_id=suit.id,
                 company_id=company.id,
@@ -957,7 +957,7 @@ def _load_legal_events(session, company: Company, legal_events: Dict):
             session.add(filing)
             session.flush()
             
-            for rp_data in filing_data.get('rolePlayers', []):
+            for rp_data in _get_list(filing_data, 'rolePlayers'):
                 role_player = SuitFilingRolePlayer(
                     suit_filing_id=filing.id,
                     role_player_type_desc=_get_nested(rp_data, 'rolePlayerType', 'description'),
@@ -972,7 +972,7 @@ def _load_legal_events(session, company: Company, legal_events: Dict):
                 )
                 session.add(role_player)
         
-        print(f"  ✓ Loaded {len(suits_data.get('filings', []))} suit filings")
+        print(f"  ✓ Loaded {len(_get_list(suits_data, 'filings'))} suit filings")
     
     # Load bankruptcy
     bankruptcy_data = legal_events.get('bankruptcy', {})
@@ -985,7 +985,7 @@ def _load_legal_events(session, company: Company, legal_events: Dict):
         session.add(bankruptcy)
         session.flush()
         
-        for filing_data in bankruptcy_data.get('filings', []):
+        for filing_data in _get_list(bankruptcy_data, 'filings'):
             filing = BankruptcyFiling(
                 bankruptcy_id=bankruptcy.id,
                 company_id=company.id,
@@ -1001,7 +1001,7 @@ def _load_legal_events(session, company: Company, legal_events: Dict):
             session.add(filing)
             session.flush()
             
-            for rp_data in filing_data.get('rolePlayers', []):
+            for rp_data in _get_list(filing_data, 'rolePlayers'):
                 role_player = BankruptcyFilingRolePlayer(
                     bankruptcy_filing_id=filing.id,
                     role_player_type_desc=_get_nested(rp_data, 'rolePlayerType', 'description'),
@@ -1016,7 +1016,7 @@ def _load_legal_events(session, company: Company, legal_events: Dict):
                 )
                 session.add(role_player)
         
-        print(f"  ✓ Loaded {len(bankruptcy_data.get('filings', []))} bankruptcy filings")
+        print(f"  ✓ Loaded {len(_get_list(bankruptcy_data, 'filings'))} bankruptcy filings")
     
     # Load claims
     claims_data = legal_events.get('claims', {})
@@ -1030,7 +1030,7 @@ def _load_legal_events(session, company: Company, legal_events: Dict):
         session.add(claim)
         session.flush()
         
-        for filing_data in claims_data.get('filings', []):
+        for filing_data in _get_list(claims_data, 'filings'):
             filing = ClaimFiling(
                 claim_id=claim.id,
                 company_id=company.id,
@@ -1046,7 +1046,7 @@ def _load_legal_events(session, company: Company, legal_events: Dict):
             session.add(filing)
             session.flush()
             
-            for rp_data in filing_data.get('rolePlayers', []):
+            for rp_data in _get_list(filing_data, 'rolePlayers'):
                 role_player = ClaimFilingRolePlayer(
                     claim_filing_id=filing.id,
                     role_player_type_desc=_get_nested(rp_data, 'rolePlayerType', 'description'),
@@ -1061,7 +1061,7 @@ def _load_legal_events(session, company: Company, legal_events: Dict):
                 )
                 session.add(role_player)
         
-        print(f"  ✓ Loaded {len(claims_data.get('filings', []))} claim filings")
+        print(f"  ✓ Loaded {len(_get_list(claims_data, 'filings'))} claim filings")
 
 
 def _load_awards(session, company: Company, awards: Dict):
@@ -1130,7 +1130,7 @@ def _load_awards(session, company: Company, awards: Dict):
         session.flush()
         
         # Load actions
-        for action_data in contract_data.get('actions', []):
+        for action_data in _get_list(contract_data, 'actions'):
             action = ContractAction(
                 contract_id=contract.id,
                 action_date=_parse_date(action_data.get('actionDate')),
@@ -1141,7 +1141,7 @@ def _load_awards(session, company: Company, awards: Dict):
             session.add(action)
         
         # Load characteristics
-        for char_data in contract_data.get('characteristics', []):
+        for char_data in _get_list(contract_data, 'characteristics'):
             char = ContractCharacteristic(
                 contract_id=contract.id,
                 description=char_data.get('description'),
@@ -1175,7 +1175,7 @@ def _load_exclusions(session, company: Company, exclusions: Dict):
     summary.inactive_exclusions_count = exclusions.get('inactiveExclusionsCount')
     
     # Load active exclusions
-    for excl_data in exclusions.get('activeExclusions', []):
+    for excl_data in _get_list(exclusions, 'activeExclusions'):
         excl = ActiveExclusion(
             company_id=company.id,
             sam_record_number=excl_data.get('samRecordNumber'),
@@ -1222,7 +1222,7 @@ def _load_significant_events(session, company: Company, significant_events: Dict
     
     # Load individual events
     events_count = 0
-    for event_data in significant_events.get('events', []):
+    for event_data in _get_list(significant_events, 'events'):
         event = SignificantEvent(
             company_id=company.id,
             event_date=_parse_date(event_data.get('eventDate')),
@@ -1244,15 +1244,15 @@ def _load_significant_events(session, company: Company, significant_events: Dict
         session.flush()
         
         # Load text entries
-        for text_data in event_data.get('textEntry', []):
-            text_entry = SignificantEventTextEntry(
-                significant_event_id=event.id,
-                text=text_data.get('text'),
-                priority=text_data.get('priority'),
-                type_description=text_data.get('typeDescription'),
-                type_dnb_code=text_data.get('typeDnBCode')
-            )
-            session.add(text_entry)
+        for text_data in _get_list(event_data, 'textEntry'):
+                text_entry = SignificantEventTextEntry(
+                    significant_event_id=event.id,
+                    text=text_data.get('text'),
+                    priority=text_data.get('priority'),
+                    type_description=text_data.get('typeDescription'),
+                    type_dnb_code=text_data.get('typeDnBCode')
+                )
+                session.add(text_entry)
         
         events_count += 1
     
@@ -1298,3 +1298,14 @@ def _get_nested(data: Dict, *keys):
         if data is None:
             return None
     return data
+
+
+def _get_list(data: Dict, key: str) -> list:
+    """Safely get a list from dictionary, handling None values."""
+    value = data.get(key)
+    if value is None:
+        return []
+    elif isinstance(value, list):
+        return value
+    else:
+        return []

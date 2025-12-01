@@ -2,8 +2,32 @@
 
 A comprehensive Python package for working with D&B Direct+ API data, providing easy access to company information, financial data, and legal events.
 
+## Architecture Overview
+
+datablockAPI follows a **separated concerns architecture** with clear separation between data acquisition and data processing:
+
+### 1. Client Request Functions (API → JSON)
+**Purpose**: Request raw responses from D&B Direct+ API and save as JSON files locally
+
+- `request_company_info()` - Requests company information and saves raw JSON
+- `request_company_financials()` - Requests financial data and saves raw JSON
+- `request_events_filings()` - Requests events/filings data and saves raw JSON
+- `request_all_data()` - Requests all data blocks and saves raw JSON files
+
+**Key Point**: These methods ONLY handle API communication and raw JSON storage. No data parsing or database operations.
+
+### 2. Loader Functions (JSON → Database)
+**Purpose**: Parse JSON files and load structured data into database tables
+
+- `load()` - Load JSON files into database with automatic data parsing and model creation
+- Handles all data transformation from raw API responses to structured database records
+- Supports batch loading and incremental updates
+
+**Key Point**: The loader handles all data parsing, validation, and database insertion.
+
 ## Features
 
+- **Separated Concerns Architecture**: Clear separation between API requests and data processing
 - **API Client**: Robust client for D&B Direct+ API with retry logic and rate limiting
 - **Data Models**: Complete SQLAlchemy models for storing and querying D&B data
 - **Data Loading**: Efficient loading of JSON data into structured database tables
@@ -12,7 +36,6 @@ A comprehensive Python package for working with D&B Direct+ API data, providing 
 - **Logging**: Structured logging throughout the package
 - **Health Checks**: System health monitoring and diagnostics
 - **Metrics**: Basic metrics collection for API usage monitoring
-- **Testing**: Comprehensive test suite with unit and integration tests
 
 ## Installation
 
@@ -24,36 +47,44 @@ pip install -r requirements.txt
 
 ```python
 from datablockAPI.api import DNBAPIClient
+import datablockAPI as api
+import pandas as pd
 
-# Initialize client
+# Initialize client and database
 client = DNBAPIClient()
+api.init(database='sqlite:///datablock.db')
 
-# Step 1: Initialize database (creates all tables)
-client.init_database('datablock.db')
-
-# Step 2: Request data for multiple companies (saves to JSON files)
+# Phase 1: Request data from D&B API (saves raw JSON files)
 duns_list = ['540924028', '315369934', '060704780']
 
 for duns in duns_list:
-    # Request company information
+    print(f"Requesting data for DUNS: {duns}")
+    
+    # These methods ONLY request API data and save raw JSON files
     client.request_company_info(duns, output_dir='company_data')
-    
-    # Request financial data
-    client.request_company_financials(duns, output_dir='financial_data')
-    
-    # Request events and filings
     client.request_events_filings(duns, output_dir='events_data')
+    # Note: Financial data may require premium subscription
 
-# Step 3: Load JSON files into database
+# Phase 2: Load JSON files into database (parses and structures data)
 import glob
-client.load_json_to_db(glob.glob('company_data/*.json'))
-client.load_json_to_db(glob.glob('financial_data/*.json'))
-client.load_json_to_db(glob.glob('events_data/*.json'))
+api.load(glob.glob('company_data/*.json'))
+api.load(glob.glob('events_data/*.json'))
 
-# Step 4: Query the database
-companies = client.query_companies(limit=5)
-for company in companies:
-    print(f"{company['duns']}: {company['primary_name']}")
+# Phase 3: Query the structured database
+session = api.get_session()
+
+# Example queries using pandas
+from datablockAPI.core.models import Company, CompanyInfo
+
+query = session.query(
+    Company.duns,
+    Company.primary_name,
+    CompanyInfo.start_date,
+    CompanyInfo.operating_status_description
+).join(CompanyInfo)
+
+df_companies = pd.read_sql(query.statement, session.bind)
+print(df_companies.head())
 ```
 
 ## Configuration
@@ -92,16 +123,6 @@ import glob
 client.load_json_to_db(glob.glob('company_data/*.json'))
 ```
 
-## Testing
-
-```bash
-# Run all tests
-pytest tests/
-
-# Run with coverage
-pytest --cov=datablockAPI tests/
-```
-
 ## Health Checks
 
 ```python
@@ -114,18 +135,9 @@ print(status)
 
 ## API Reference
 
-### DNBAPIClient
+### DNBAPIClient - Request Functions (API → JSON)
 
-Main client for interacting with D&B Direct+ API using a separated concerns architecture.
-
-#### Database Management
-
-- `init_database(database_path, create_if_not_exists=True)`: Initialize database connection and create all tables
-- `get_session()`: Get SQLAlchemy session for direct database queries
-
-#### Data Request Methods (API → JSON)
-
-These methods request data from D&B API and save responses to JSON files. They do NOT load data into the database.
+These methods ONLY request data from D&B API and save raw JSON responses to local files:
 
 - `request_data_blocks(duns, block_ids, output_dir="dnb_data")`: Request specific data blocks by ID
 - `request_company_info(duns, output_dir="dnb_data")`: Request company information only
@@ -133,25 +145,62 @@ These methods request data from D&B API and save responses to JSON files. They d
 - `request_events_filings(duns, output_dir="dnb_data")`: Request events and filings only
 - `request_all_data(duns, output_dir="dnb_data")`: Request all data blocks
 
-#### Data Loading Methods (JSON → Database)
+### Loader Functions (JSON → Database)
 
-These methods load previously saved JSON files into the database. They do NOT make API calls.
+These functions parse JSON files and load structured data into database tables:
 
-- `load_json_to_db(json_files)`: Load JSON file(s) into database tables
+- `api.load(json_files)`: Load JSON file(s) into database with automatic parsing
+- `api.load_json_to_db(json_files)`: Alternative loading method
 
-#### Query Methods
+### Query Examples
 
-- `query_companies(limit=None, filters=None)`: Query companies with optional filters
-- `query_company_by_duns(duns)`: Get company details by DUNS number
+Once data is loaded into the database, you can query it using SQLAlchemy and pandas:
+
+```python
+import datablockAPI as api
+import pandas as pd
+from datablockAPI.core.models import Company, CompanyInfo, LegalEventsSummary
+
+# Get database session
+session = api.get_session()
+
+# Example 1: Basic company information
+query = session.query(
+    Company.duns,
+    Company.primary_name,
+    CompanyInfo.start_date,
+    CompanyInfo.operating_status_description,
+    CompanyInfo.primary_address_locality,
+    CompanyInfo.primary_address_country
+).join(CompanyInfo)
+
+df_companies = pd.read_sql(query.statement, session.bind)
+print("Company Information:")
+print(df_companies.head())
+
+# Example 2: Legal events summary
+query = session.query(
+    Company.primary_name,
+    LegalEventsSummary.has_liens,
+    LegalEventsSummary.has_judgments,
+    LegalEventsSummary.has_suits,
+    LegalEventsSummary.has_bankruptcy
+).join(LegalEventsSummary)
+
+df_legal = pd.read_sql(query.statement, session.bind)
+print("\\nLegal Events Summary:")
+print(df_legal.head())
+```
 
 ### Separated Concerns Architecture
 
-The datablockAPI follows a **separated concerns** design pattern that clearly separates data acquisition from data storage:
+datablockAPI follows a **separated concerns** design pattern that clearly separates data acquisition from data storage:
 
 #### Request Phase (API → JSON)
 - **Purpose**: Fetch data from D&B Direct+ API and save to JSON files
-- **Methods**: `request_*()` methods
-- **Benefits**: 
+- **Methods**: `client.request_*()` methods
+- **Output**: Raw JSON files with complete API responses
+- **Benefits**:
   - Independent of database operations
   - Can retry failed requests without affecting stored data
   - JSON files serve as permanent data backup
@@ -159,7 +208,8 @@ The datablockAPI follows a **separated concerns** design pattern that clearly se
 
 #### Load Phase (JSON → Database)
 - **Purpose**: Parse JSON files and populate structured database tables
-- **Methods**: `load_json_to_db()`
+- **Methods**: `api.load()` functions
+- **Input**: Raw JSON files from request phase
 - **Benefits**:
   - Independent of API availability
   - Can reload data without re-requesting from API
@@ -168,32 +218,21 @@ The datablockAPI follows a **separated concerns** design pattern that clearly se
 
 #### Workflow Example
 ```python
-# Phase 1: Request data (can be done when API is available)
-client.request_company_info('540924028', output_dir='company_data')
-client.request_events_filings('540924028', output_dir='events_data')
+# Phase 1: Request data (requires API access)
+client.request_company_info('540924028', output_dir='data')
+client.request_events_filings('540924028', output_dir='data')
 
 # Phase 2: Load data (can be done anytime, even offline)
-client.load_json_to_db(glob.glob('company_data/*.json'))
-client.load_json_to_db(glob.glob('events_data/*.json'))
+api.load(glob.glob('data/*.json'))
 
 # Phase 3: Query data (always available once loaded)
-companies = client.query_companies()
+session = api.get_session()
+# ... run queries as shown in examples above
 ```
 
-### Data Models
+## Data Models and Schema
 
-Complete SQLAlchemy models for:
-- Companies
-- Company Information
-- Industry Codes
-- Legal Events (Liens, Judgments, Suits, etc.)
-- Financial Statements
-- Significant Events
-- Exclusions
-
-## Data Models and Entity Relationships
-
-The datablockAPI uses a comprehensive SQLAlchemy-based data model to represent D&B company data. The database schema consists of 56+ tables organized around core business entities.
+datablockAPI uses a comprehensive SQLAlchemy-based data model with **56+ tables** organized around core business entities. The schema captures all aspects of D&B company data including legal events, financial statements, and business metadata.
 
 ### Core Entities
 
@@ -210,82 +249,85 @@ Detailed company information and metadata linked to each Company.
 
 ### Legal Events System
 
-The legal events system captures various types of legal proceedings and filings:
+Captures various types of legal proceedings and filings:
 
-#### Event Types
-- **Liens**: Security interests and claims against company assets
-- **Judgments**: Court-ordered financial obligations
-- **Suits**: Legal proceedings and lawsuits
-- **Bankruptcies**: Insolvency proceedings
-- **Claims**: Various legal claims and disputes
+#### Event Types & Tables
+- **Liens**: `Lien` → `LienFiling` → `LienFilingRolePlayer`
+- **Judgments**: `Judgment` → `JudgmentFiling` → `JudgmentFilingRolePlayer`
+- **Suits**: `Suit` → `SuitFiling` → `SuitFilingRolePlayer`
+- **Bankruptcies**: `Bankruptcy` → `BankruptcyFiling` → `BankruptcyFilingRolePlayer`
+- **Claims**: `Claim` → `ClaimFiling` → `ClaimFilingRolePlayer`
 
-#### Event Structure
-Each event type follows a consistent pattern:
-- **Summary Table**: High-level counts and status (e.g., `LegalEventsSummary`)
-- **Event Table**: Individual events (e.g., `Lien`, `Judgment`)
-- **Filing Table**: Specific legal filings (e.g., `LienFiling`, `JudgmentFiling`)
-- **Role Players**: Parties involved in the event
-- **Reference Dates**: Important dates related to the event
-- **Text Entries**: Detailed descriptions and notes
+#### Legal Events Summary
+- **LegalEventsSummary**: High-level counts and status flags for all legal event types
 
 ### Financial Data System
 
 #### FinancialStatement
 Core financial reporting entity containing balance sheets, income statements, and cash flow data.
 - **Relationships**:
-  - `FinancialOverview`: Summary financial metrics
+  - `FinancialOverview`: Summary financial metrics and ratios
   - `BalanceSheetItem`: Individual balance sheet line items
   - `ProfitLossItem`: Income statement items
   - `CashFlowItem`: Cash flow statement items
   - `FinancialRatio`: Calculated financial ratios
 
-### Company Metadata
+### Company Metadata Tables
 
 #### Industry & Business Classification
-- **IndustryCode**: SIC/NAICS industry classifications
+- **IndustryCode**: SIC/NAICS industry classifications with descriptions
 - **UNSPSCCode**: United Nations product/service codes
-- **CompanyActivity**: Business activities and operations
+- **CompanyActivity**: Business activities and operations descriptions
 
 #### Contact & Location
 - **WebsiteAddress**: Company websites and URLs
+- **TelephoneNumber**: Phone numbers with international dialing codes
+- **EmailAddress**: Email addresses
 - **RegistrationNumber**: Business registration numbers by jurisdiction
+- **StockExchange**: Stock exchange listings and ticker symbols
 
 #### Human Resources
-- **EmployeeFigure**: Headcount and employee information
+- **EmployeeFigure**: Headcount and employee information with date ranges
+
+#### Trade & Legal
+- **TradeStyleName**: Alternative company names and tradestyles
+- **MultilingualName**: Company names in different languages
+- **Bank**: Banking relationships
 
 ### Events & Activities
 
 #### Significant Events
-- **SignificantEvent**: Major corporate events (mergers, acquisitions, etc.)
-- **SignificantEventTextEntry**: Detailed descriptions of events
+- **SignificantEvent**: Major corporate events (mergers, acquisitions, disasters, etc.)
+- **SignificantEventTextEntry**: Detailed descriptions and impact details
 
 #### Awards & Contracts
 - **AwardsSummary**: Summary of government contracts and awards
-- **Contract**: Individual contract details
-- **ContractAction**: Contract modifications and updates
+- **Contract**: Individual contract details with amounts and agencies
+- **ContractAction**: Contract modifications and funding actions
+- **ContractCharacteristic**: Contract classifications and types
 
 #### Financing Events
 - **FinancingEventsSummary**: Summary of financing activities
-- **FinancingEvent**: Individual financing events (UCC filings, etc.)
-- **FinancingEventFiling**: Specific financing filings
+- **FinancingEvent**: Individual financing events (loans, grants, debts)
+- **FinancingEventFiling**: Specific financing filings and UCC records
 
 ### Risk & Compliance
 
 #### Exclusions
-- **ExclusionsSummary**: Government exclusion status
-- **Exclusion**: Individual exclusion records
+- **ExclusionsSummary**: Government exclusion status and counts
+- **ActiveExclusion**: Individual active exclusion records with agencies and dates
 
-### Entity Relationship Diagram Overview
+### Entity Relationship Diagram
 
 ```
 Company (1) ──── (1) CompanyInfo
     │                    │
     ├── (1) LegalEventsSummary
-    ├── (*) Lien ─── (*) LienFiling
-    ├── (*) Judgment ─── (*) JudgmentFiling
-    ├── (*) Suit ─── (*) SuitFiling
-    ├── (*) Bankruptcy ─── (*) BankruptcyFiling
-    ├── (*) Claim ─── (*) ClaimFiling
+    ├── (*) Lien ─── (*) LienFiling ─── (*) LienFilingRolePlayer
+    ├── (*) Judgment ─── (*) JudgmentFiling ─── (*) JudgmentFilingRolePlayer
+    ├── (*) Suit ─── (*) SuitFiling ─── (*) SuitFilingRolePlayer
+    ├── (*) Bankruptcy ─── (*) BankruptcyFiling ─── (*) BankruptcyFilingRolePlayer
+    ├── (*) Claim ─── (*) ClaimFiling ─── (*) ClaimFilingRolePlayer
     ├── (1) FinancialStatement ─── (1) FinancialOverview
     │                              ├── (*) BalanceSheetItem
     │                              ├── (*) ProfitLossItem
@@ -293,26 +335,25 @@ Company (1) ──── (1) CompanyInfo
     │                              └── (*) FinancialRatio
     ├── (*) SignificantEvent ─── (*) SignificantEventTextEntry
     ├── (1) AwardsSummary ─── (*) Contract ─── (*) ContractAction
+    │                        └── (*) ContractCharacteristic
     ├── (1) FinancingEventsSummary ─── (*) FinancingEvent ─── (*) FinancingEventFiling
-    └── (1) ExclusionsSummary ─── (*) Exclusion
+    └── (1) ExclusionsSummary ─── (*) ActiveExclusion
 ```
 
 ### Key Relationships
 
-- **One-to-One**: Company ↔ CompanyInfo, Company ↔ [Summary Tables]
-- **One-to-Many**: Company → Events, FinancialStatement → Financial Items
-- **Many-to-Many**: Companies can have multiple industry codes, activities, etc.
+- **One-to-One**: Company ↔ CompanyInfo, Company ↔ Summary tables
+- **One-to-Many**: Company → Events, FinancialStatement → Financial line items
+- **Many-to-Many**: Companies can have multiple industry codes, activities, contacts, etc.
 - **Hierarchical**: Events → Filings → Role Players/Text Entries
 
-### Database Schema
+### Database Schema Features
 
-The complete schema includes:
 - **56+ tables** with proper foreign key relationships
 - **Comprehensive indexing** on frequently queried fields (DUNS, dates, codes)
 - **Data integrity constraints** ensuring referential integrity
-- **Audit fields** (created_at, updated_at) on all tables
-
-This relational structure enables complex queries across company data, legal events, financial performance, and business intelligence analysis.
+- **Audit fields** (`created_at`, `updated_at`) on all tables
+- **Support for complex queries** across company data, legal events, and financial performance
 
 ## Error Handling
 
@@ -344,8 +385,8 @@ mypy datablockAPI/
 
 1. Fork the repository
 2. Create a feature branch
-3. Add tests for new functionality
-4. Ensure all tests pass
+3. Add comprehensive documentation for new functionality
+4. Ensure code follows the established patterns and architecture
 5. Submit a pull request
 
 ## License
