@@ -3,13 +3,13 @@ datablockAPI - Health Check Module
 Health checks for monitoring and diagnostics.
 """
 
-from typing import Dict, Any
 import logging
+from typing import Any, Dict
 
 from .api.client import DNBAPIClient
 from .core.database import get_session
 
-logger = logging.getLogger('datablockAPI')
+logger = logging.getLogger("datablockAPI")
 
 
 def health_check() -> Dict[str, Any]:
@@ -22,11 +22,15 @@ def health_check() -> Dict[str, Any]:
     results = {
         "database": _check_database(),
         "api_client": _check_api_client(),
-        "overall": "healthy"
+        "overall": "healthy",
     }
 
     # Determine overall health
-    if any(result.get("status") == "unhealthy" for result in results.values() if isinstance(result, dict)):
+    if any(
+        result.get("status") == "unhealthy"
+        for result in results.values()
+        if isinstance(result, dict)
+    ):
         results["overall"] = "unhealthy"
 
     return results
@@ -51,7 +55,7 @@ def _check_api_client() -> Dict[str, Any]:
         return {
             "status": "healthy",
             "message": "API client configured successfully",
-            "has_credentials": bool(client.api_key and client.api_secret)
+            "has_credentials": bool(client.api_key and client.api_secret),
         }
     except Exception as e:
         logger.error(f"API client health check failed: {e}")

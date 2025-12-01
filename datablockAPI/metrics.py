@@ -3,10 +3,9 @@ datablockAPI - Metrics Collection
 Basic metrics collection for monitoring API usage.
 """
 
-from typing import Dict, Any
-from collections import defaultdict
 import time
-from .logging_config import logger
+from collections import defaultdict
+from typing import Any, Dict
 
 
 class MetricsCollector:
@@ -70,4 +69,3 @@ def record_database_operation(operation: str, success: bool = True):
         metrics.increment("db_operations_failed")
 
     metrics.increment(f"db_operations_{operation}")
-<parameter name="filePath">c:\Users\jun\dataground\datablockAPI\metrics.py

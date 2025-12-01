@@ -4,10 +4,8 @@ Handles database connection, initialization, and base configuration.
 """
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.pool import NullPool
-from typing import Optional
-import os
 
 # SQLAlchemy Base for all models
 Base = declarative_base()
@@ -20,40 +18,35 @@ _SessionLocal = None
 def init(database: str, echo: bool = False, **kwargs):
     """
     Initialize the database connection and create all tables.
-    
+
     Args:
         database: Database connection string (e.g., 'postgresql://user:pass@localhost/db')
         echo: Whether to log SQL statements (default: False)
         **kwargs: Additional arguments to pass to create_engine
-    
+
     Examples:
         >>> import datablockAPI as api
         >>> api.init(database='sqlite:///datablock.db')
         >>> api.init(database='postgresql://user:pass@localhost:5432/datablock')
     """
     global _engine, _SessionLocal
-    
+
     # Create engine
     _engine = create_engine(
         database,
         echo=echo,
-        poolclass=NullPool if database.startswith('sqlite') else None,
-        **kwargs
+        poolclass=NullPool if database.startswith("sqlite") else None,
+        **kwargs,
     )
-    
+
     # Create session factory
-    _SessionLocal = sessionmaker(
-        autocommit=False,
-        autoflush=False,
-        bind=_engine
-    )
-    
+    _SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=_engine)
+
     # Import all models to register them with Base
-    from . import models
-    
+
     # Create all tables
     Base.metadata.create_all(bind=_engine)
-    
+
     print(f"✓ Database initialized: {database}")
     print(f"✓ Created {len(Base.metadata.tables)} tables")
 
